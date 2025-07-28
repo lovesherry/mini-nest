@@ -1,0 +1,13 @@
+{
+    "compilerOptions": {
+        "target": "ES2021", // 支持 async/await 和现代语法
+        "module": "commonjs", // 输出为 ES 模块（import/export）
+        "strict": true, // 启用所有严格类型检查
+        "esModuleInterop": true, // 兼容 commonjs 模块
+        "forceConsistentCasingInFileNames": true, // 文件名大小写一致性检查
+        "skipLibCheck": true, // 跳过声明文件检查（加快编译）
+        "resolveJsonModule": true, // 允许导入 JSON 文件
+        "experimentalDecorators": true, // 开启装饰器支持
+        "emitDecoratorMetadata": true, // 配合 reflect-metadata 使用
+    },
+}
