@@ -1,17 +1,19 @@
 {
   "name": "mini-nest",
   "version": "0.1.0",
-  "type": "module",
+  "type": "commonjs",
   "scripts": {
-    "dev": "tsx --tsconfig tsconfig.json ./example/main.ts"
+    "dev": "ts-node -r tsconfig-paths/register ./example/main.ts",
+    "build": "tsc"
   },
   "dependencies": {
     "express": "5.1.0",
-    "reflect-metadata": "^0.1.13"
+    "reflect-metadata": "0.2.2"
   },
   "devDependencies": {
     "@types/express": "5.0.3",
-    "tsx": "4.20.3",
+    "ts-node": "10.9.2",
+    "tsconfig-paths": "4.2.0",
     "typescript": "^5.4.5"
   }
 }

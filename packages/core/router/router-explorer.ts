@@ -6,6 +6,7 @@ import {
   ROUTE_ARGS_METADATA,
 } from "@packages/common/constants";
 import { exchangeKeyForValue } from "./route-params-factory";
+import { Container } from "../injector/container";
 
 type TRequestMethod = "get" | "post" | "put" | "delete";
 
@@ -13,10 +14,10 @@ type RouteParamsMeta = {
   [key: string]: RouteParamMetadata;
 };
 export class RouterExplorer {
-  constructor(private app: Express) {}
+  constructor(private app: Express, private container: Container) {}
 
   public registerController(ControllerClass: new () => any) {
-    const instance = new ControllerClass();
+    const instance: any = this.container.resolve(ControllerClass);
     const prototype = ControllerClass.prototype;
     const prefix: string =
       Reflect.getMetadata(PATH_METADATA, ControllerClass) || "";

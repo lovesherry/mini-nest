@@ -1,6 +1,6 @@
 {
     "compilerOptions": {
-        "target": "ES2021", // 支持 async/await 和现代语法
+        "target": "ES2022", // 支持 async/await 和现代语法
         "module": "commonjs", // 输出为 ES 模块（import/export）
         "strict": true, // 启用所有严格类型检查
         "esModuleInterop": true, // 兼容 commonjs 模块
