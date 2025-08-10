@@ -7,6 +7,7 @@ import {
 } from "@packages/common/constants";
 import { exchangeKeyForValue } from "./route-params-factory";
 import { Container } from "../injector/container";
+import { Type } from "@packages/common/interfaces";
 
 type TRequestMethod = "get" | "post" | "put" | "delete";
 
@@ -16,11 +17,11 @@ type RouteParamsMeta = {
 export class RouterExplorer {
   constructor(private app: Express, private container: Container) {}
 
-  public registerController(ControllerClass: new () => any) {
-    const instance: any = this.container.resolve(ControllerClass);
-    const prototype = ControllerClass.prototype;
+  public registerRoutes(controllerClass: Type<any>) {
+    const instance: any = this.container.resolve(controllerClass);
+    const prototype = controllerClass.prototype;
     const prefix: string =
-      Reflect.getMetadata(PATH_METADATA, ControllerClass) || "";
+      Reflect.getMetadata(PATH_METADATA, controllerClass) || "";
 
     const methodNames = Object.getOwnPropertyNames(prototype).filter(
       (name) => typeof prototype[name] === "function" && name !== "constructor"
@@ -38,7 +39,7 @@ export class RouterExplorer {
       const fullPath =
         prefix + (routePath.startsWith("/") ? routePath : "/" + routePath);
       const paramMeta: RouteParamsMeta =
-        Reflect.getMetadata(ROUTE_ARGS_METADATA, ControllerClass, methodName) ||
+        Reflect.getMetadata(ROUTE_ARGS_METADATA, controllerClass, methodName) ||
         [];
 
       this.app[requestMethod](fullPath, async (req, res, next) => {
@@ -65,7 +66,7 @@ export class RouterExplorer {
 
       console.log(
         `[Route Registered] ${requestMethod.toUpperCase()} ${fullPath} -> ${
-          ControllerClass.name
+          controllerClass.name
         }.${methodName}`
       );
     }

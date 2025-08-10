@@ -10,7 +10,7 @@ import {
   Res,
 } from "@packages/common";
 import type { Response } from "express";
-import { UserInfo } from "./types";
+import { UserInfo } from "../types";
 import { UserService } from "./user.service";
 
 @Controller()

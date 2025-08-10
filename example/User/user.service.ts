@@ -1,5 +1,5 @@
-import { UserInfo } from "./types";
-import type { LoggerService } from "./Logger/logger.service";
+import { UserInfo } from "../types";
+import type { LoggerService } from "../Logger/logger.service";
 import { Inject, Injectable } from "@packages/common";
 
 @Injectable()

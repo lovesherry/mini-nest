@@ -1,11 +1,13 @@
 import { SELF_DECLARED_DEPS_METADATA } from "@packages/common/constants";
 import { Constructor, Provider, Token } from "./types";
+import { Type } from "@packages/common/interfaces";
 
 export class Container {
   private providers = new Map<Token, Provider>();
+  private controllers = new Map<Token, Provider>();
   private instances = new Map<Token, any>();
 
-  register(providers: Provider[]) {
+  registerProviders(providers: Provider[]) {
     for (const provider of providers) {
       if (typeof provider === "function") {
         this.providers.set(provider, provider);
@@ -15,13 +17,20 @@ export class Container {
     }
   }
 
-  resolve<T>(token: Token): T | null {
+  public registerControllers(controllers: Type<any>[]) {
+    for (const controller of controllers) {
+      if (typeof controller === "function") {
+        this.controllers.set(controller, controller);
+      }
+    }
+  }
+
+  public resolve<T>(token: Token): T | null {
     // 已缓存
     if (this.instances.has(token)) {
       return this.instances.get(token);
     }
-
-    const provider = this.providers.get(token);
+    const provider = this.controllers.get(token) || this.providers.get(token);
 
     if (!provider) {
       // 用户定义了找不到映射关系的变量，返回null
