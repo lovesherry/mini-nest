@@ -1,1 +1,1 @@
-export * from "./re-module.decorator";
+export * from "./module.decorator";
