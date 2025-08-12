@@ -11,18 +11,21 @@ import {
 } from "@packages/common";
 import type { Response } from "express";
 import { UserInfo } from "../types";
-import { UserService } from "./user.service";
+import type { UserService } from "./user.service";
 
-@Controller()
+@Controller("/user")
 export class UserController {
-  constructor(private userService: UserService, ad: string) {}
+  constructor(
+    @Inject("customService") private userService: UserService,
+    ad: string
+  ) {}
 
-  @Get("/user/:id")
+  @Get(":id")
   async getUserInfo(@Param("id") userId: string): Promise<UserInfo> {
     return await this.userService.getUserInfo(userId);
   }
 
-  @Post("/addUser")
+  @Post("add")
   addUser(
     @Body("name") name: string,
     @Body() body: object,

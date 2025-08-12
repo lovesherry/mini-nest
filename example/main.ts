@@ -1,8 +1,8 @@
 import { NestFactory } from "@packages/core";
-import UserModule from "./User/user.module";
+import { AppModule } from "./App/app.module";
 
 async function bootstrap() {
-  const app = NestFactory.create(UserModule);
+  const app = NestFactory.create(AppModule);
   app.listen(process.env.PORT ?? 3000, () => {
     console.log(`Server listening on port ${process.env.PORT ?? 3000}`);
   });

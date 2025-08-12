@@ -8,6 +8,7 @@ import {
 import { exchangeKeyForValue } from "./route-params-factory";
 import { Container } from "../injector/container";
 import { Type } from "@packages/common/interfaces";
+import { Module } from "../injector/module";
 
 type TRequestMethod = "get" | "post" | "put" | "delete";
 
@@ -17,8 +18,17 @@ type RouteParamsMeta = {
 export class RouterExplorer {
   constructor(private app: Express, private container: Container) {}
 
-  public registerRoutes(controllerClass: Type<any>) {
-    const instance: any = this.container.resolve(controllerClass);
+  public registerAllRoutes() {
+    const modules = this.container.getModules();
+    for (const [, moduleRef] of modules) {
+      for (const [, wrapper] of moduleRef.controllers) {
+        if (!wrapper.metatype) continue;
+        this.registerRoutes(wrapper.metatype, moduleRef);
+      }
+    }
+  }
+  private registerRoutes(controllerClass: Type<any>, moduleRef: Module) {
+    const instance: any = this.container.resolve(controllerClass, moduleRef);
     const prototype = controllerClass.prototype;
     const prefix: string =
       Reflect.getMetadata(PATH_METADATA, controllerClass) || "";
