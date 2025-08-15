@@ -16,7 +16,7 @@ import type { UserService } from "./user.service";
 @Controller("/user")
 export class UserController {
   constructor(
-    @Inject("customService") private userService: UserService,
+    @Inject("customUserService") private userService: UserService,
     ad: string
   ) {}
 

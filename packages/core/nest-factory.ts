@@ -7,18 +7,24 @@ import { Module } from "./injector/module";
 type IEntryNestModule = Type<any>;
 
 export class NestFactory {
-  static create(moduleCls: IEntryNestModule) {
+  static async create(moduleCls: IEntryNestModule) {
     const httpServer = createHttpServer();
     // 创建DI容器
     const container = new Container();
 
-    // 1. 递归扫描模块（构建模块依赖图）
+    // 1. 递归扫描模块（构建模块依赖图）；
+    // 参考源码：dependenciesScanner.scanForModules
     this.scanModules(moduleCls, container);
 
-    // 2. 填充 providers/controllers/exports
+    // 2. 注册模块的 providers/controllers/exports
+    // 参考源码：dependenciesScanner.scanModulesForDependencies
     this.registerModules(container);
 
-    // 3. 注册路由（入口模块）
+    // 3. 实例化所有依赖
+    // 参考源码：instanceLoader.createInstances
+    await container.createInstancesOfDependencies();
+
+    // 4. 注册路由（入口模块）
     const routerExplorer = new RouterExplorer(httpServer, container);
     routerExplorer.registerAllRoutes();
     console.log(container.getModules());
@@ -26,35 +32,35 @@ export class NestFactory {
     return httpServer;
   }
 
-  private static scanModules(
-    moduleCls: Type<any>,
-    container: Container
-  ): Module {
-    const moduleRef = container.addModule(moduleCls);
+  // 递归扫描模块，构建模块依赖关系（仅添加模块）
+  private static scanModules(moduleCls: Type<any>, container: Container) {
+    container.addModule(moduleCls);
     const imports = Reflect.getMetadata("imports", moduleCls) || [];
-
     for (const importedModule of imports) {
-      const importedRef = this.scanModules(importedModule, container);
-      moduleRef.addImport(importedRef);
+      this.scanModules(importedModule, container);
     }
-
-    return moduleRef;
   }
 
+  // 遍历所有模块，注册 providers/controllers/exports 到 Module 实例
   private static registerModules(container: Container) {
-    container.getModules().forEach((moduleRef) => {
+    const modules = container.getModules();
+    modules.forEach((moduleRef) => {
       const moduleClass = moduleRef.metatype;
+
+      const imports = Reflect.getMetadata("imports", moduleClass) || [];
+      for (const c of imports) {
+        const importedModule = container.getModule(c);
+        importedModule && moduleRef.addImport(importedModule);
+      }
 
       const providers = Reflect.getMetadata("providers", moduleClass) || [];
       for (const p of providers) {
         moduleRef.addProvider(p);
       }
-
       const controllers = Reflect.getMetadata("controllers", moduleClass) || [];
       for (const c of controllers) {
         moduleRef.addController(c);
       }
-
       const exportsList = Reflect.getMetadata("exports", moduleClass) || [];
       for (const e of exportsList) {
         moduleRef.addExportedProviderOrModule(e);

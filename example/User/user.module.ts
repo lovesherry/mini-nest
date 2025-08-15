@@ -9,7 +9,7 @@ import { LoggerModule } from "example/Logger/logger.module";
   controllers: [UserController],
   providers: [
     {
-      provide: "customService",
+      provide: "customUserService",
       useClass: UserService,
     },
   ],

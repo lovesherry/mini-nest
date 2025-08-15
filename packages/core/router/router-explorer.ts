@@ -23,12 +23,14 @@ export class RouterExplorer {
     for (const [, moduleRef] of modules) {
       for (const [, wrapper] of moduleRef.controllers) {
         if (!wrapper.metatype) continue;
-        this.registerRoutes(wrapper.metatype, moduleRef);
+        this.registerRoutes(wrapper.metatype as Type<any>, moduleRef);
       }
     }
   }
   private registerRoutes(controllerClass: Type<any>, moduleRef: Module) {
-    const instance: any = this.container.resolve(controllerClass, moduleRef);
+    const wrapper = moduleRef.controllers.get(controllerClass);
+    if (!wrapper || !wrapper.instance) return;
+    const instance = wrapper.instance;
     const prototype = controllerClass.prototype;
     const prefix: string =
       Reflect.getMetadata(PATH_METADATA, controllerClass) || "";

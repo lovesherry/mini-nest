@@ -1,5 +1,4 @@
 import {
-  Abstract,
   ClassProvider,
   ExistingProvider,
   FactoryProvider,
@@ -8,7 +7,7 @@ import {
   Type,
   ValueProvider,
 } from "@packages/common/interfaces";
-import { InstanceWrapper } from "@packages/common/interfaces/modules/module.interface";
+import { InstanceWrapper } from "../instance-wrapper";
 
 export class Module {
   private _providers = new Map<InjectionToken, InstanceWrapper>();
@@ -44,20 +43,26 @@ export class Module {
       return this.addCustomProvider(provider);
     }
     // provider is a class
-    this._providers.set(provider as InjectionToken, {
-      token: provider as InjectionToken,
-      metatype: provider as Type,
-      instance: null,
-    });
+    this._providers.set(
+      provider as InjectionToken,
+      new InstanceWrapper({
+        token: provider as InjectionToken,
+        metatype: provider as Type,
+        instance: null,
+      })
+    );
     return provider;
   }
 
   public addController(controller: Type) {
-    this._controllers.set(controller, {
-      token: controller,
-      metatype: controller,
-      instance: null,
-    });
+    this._controllers.set(
+      controller,
+      new InstanceWrapper({
+        token: controller,
+        metatype: controller,
+        instance: null,
+      })
+    );
   }
 
   public addExportedProviderOrModule(exported: Provider | string | symbol) {
@@ -82,35 +87,46 @@ export class Module {
   ) {
     if (this.isCustomClass(provider)) {
       const { provide, useClass } = provider;
-      this._providers.set(provide, {
-        token: provide,
-        metatype: useClass,
-        instance: null,
-      });
+      this._providers.set(
+        provide,
+        new InstanceWrapper({
+          token: provide,
+          metatype: useClass,
+          instance: null,
+        })
+      );
     } else if (this.isCustomValue(provider)) {
       const { provide, useValue } = provider;
-      this._providers.set(provide, {
-        token: provide,
-        metatype: null as any,
-        instance: useValue,
-      });
+      this._providers.set(
+        provide,
+        new InstanceWrapper({
+          token: provide,
+          metatype: null as any,
+          instance: useValue,
+        })
+      );
     } else if (this.isCustomFactory(provider)) {
       const { provide, useFactory, inject = [] } = provider;
-      this._providers.set(provide, {
-        token: provide,
-        metatype: useFactory as any,
-        instance: null,
-        inject,
-      });
+      this._providers.set(
+        provide,
+        new InstanceWrapper({
+          token: provide,
+          metatype: useFactory as any,
+          instance: null,
+          inject,
+        })
+      );
     } else if (this.isCustomUseExisting(provider)) {
       const { provide, useExisting } = provider;
-      this._providers.set(provide, {
-        token: provide,
-        metatype: null as any,
-        instance: null,
-        inject: [useExisting],
-        isAlias: true,
-      });
+      this._providers.set(
+        provide,
+        new InstanceWrapper({
+          token: provide,
+          metatype: (instance: any) => instance,
+          instance: null,
+          inject: [useExisting],
+        })
+      );
     }
     return (provider as any).provide;
   }

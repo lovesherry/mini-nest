@@ -4,7 +4,10 @@ import { Inject, Injectable } from "@packages/common";
 
 @Injectable()
 export class UserService {
-  constructor(private loggerService: LoggerService) {}
+  @Inject(LoggerService)
+  private loggerService!: LoggerService;
+  constructor() {}
+
   async getUserInfo(id: string): Promise<UserInfo> {
     this.loggerService.log(`getUserInfo: ${id}`);
     return {

@@ -1,7 +1,11 @@
-import { SELF_DECLARED_DEPS_METADATA } from "@packages/common/constants";
-import { Constructor, Provider, Token } from "./types";
+import {
+  PROPERTY_DEPS_METADATA,
+  SELF_DECLARED_DEPS_METADATA,
+} from "@packages/common/constants";
+import { Token } from "./types";
 import { InjectionToken, Type } from "@packages/common/interfaces";
 import { Module } from "./module";
+import { InstanceWrapper } from "../instance-wrapper";
 
 export class Container {
   private modules = new Map<Type, Module>();
@@ -17,10 +21,14 @@ export class Container {
     return this.modules;
   }
 
+  getModule(moduleClass: Type) {
+    return this.modules.get(moduleClass);
+  }
+
   /**
    * 依赖解析，限定在指定模块内查找
    */
-  public resolve<T>(token: InjectionToken, moduleRef: Module): T {
+  private resolve<T>(token: InjectionToken, moduleRef: Module): T {
     const { wrapper, module: foundModule } =
       this.findInstanceWrapper(token, moduleRef) || {};
     if (!wrapper || !foundModule) {
@@ -29,30 +37,19 @@ export class Container {
     if (wrapper.instance) {
       return wrapper.instance as T;
     }
-    // Class provider
-    if (
-      wrapper.metatype &&
-      typeof wrapper.metatype === "function" &&
-      !wrapper.isAlias &&
-      !wrapper.inject
-    ) {
-      return this.instantiateClassProvider(wrapper, foundModule);
-    }
-    // Factory provider
+    // Factory provider / Existing provider
     if (
       wrapper.metatype &&
       typeof wrapper.metatype === "function" &&
       Array.isArray(wrapper.inject)
     ) {
-      return this.instantiateFactoryProvider(wrapper, foundModule);
+      return this.instantiateFactoryAndExistingProvider(wrapper, foundModule);
     }
-    // Value provider
-    if (wrapper.metatype === null && wrapper.instance !== undefined) {
-      return this.instantiateValueProvider(wrapper, foundModule);
-    }
-    // Alias provider (useExisting)
-    if (wrapper.isAlias && Array.isArray(wrapper.inject)) {
-      return this.resolveAliasProvider(wrapper, foundModule);
+    // Normal provider / Class provider
+    if (wrapper.metatype && typeof wrapper.metatype === "function") {
+      const instance = this.instantiateProvider(wrapper, foundModule) as T;
+      this.applyProperties(instance, wrapper.metatype as Type, foundModule);
+      return instance;
     }
     return null as any;
   }
@@ -62,29 +59,53 @@ export class Container {
    */
   private findInstanceWrapper(
     token: InjectionToken,
-    moduleRef: Module
-  ): { wrapper: any; module: Module } | null {
-    // 查找 providers 和 controllers
-    let wrapper =
-      moduleRef.providers.get(token) ??
-      moduleRef.controllers.get(token as Type);
-    if (wrapper) {
-      return { wrapper, module: moduleRef };
+    moduleRef: Module,
+    isNested = false
+  ): { wrapper: InstanceWrapper; module: Module } | null {
+    // 1️⃣ 如果不是递归调用，先查当前模块的 providers/controllers
+    if (!isNested) {
+      const wrapper =
+        moduleRef.providers.get(token) ??
+        moduleRef.controllers.get(token as Type);
+      if (wrapper) {
+        return { wrapper, module: moduleRef };
+      }
+    } else {
+      // 额外判断：当前模块自己是否同时在 providers 和 exports 中有 token
+      if (moduleRef.providers.has(token) && moduleRef.exports.has(token)) {
+        return { wrapper: moduleRef.providers.get(token)!, module: moduleRef };
+      }
     }
-    // 递归 imports（只在 exports 中声明的 token）
+
+    // 2️⃣ 遍历 imports
     for (const importedModule of moduleRef.imports) {
-      if (importedModule.exports.has(token)) {
-        const found = this.findInstanceWrapper(token, importedModule);
+      if (
+        importedModule.providers.has(token) &&
+        importedModule.exports.has(token)
+      ) {
+        return {
+          wrapper: importedModule.providers.get(token)!,
+          module: importedModule,
+        };
+      }
+
+      const nestedModules = [...importedModule.imports].filter((m) =>
+        importedModule.exports.has(m.metatype)
+      );
+
+      for (const nestedModule of nestedModules) {
+        const found = this.findInstanceWrapper(token, nestedModule, true);
         if (found) return found;
       }
     }
+
     return null;
   }
 
   /**
-   * 实例化 class provider（useClass/class本身），并缓存实例
+   * 实例化 class / normal  provider（useClass/class本身），并缓存实例
    */
-  private instantiateClassProvider<T>(wrapper: any, moduleRef: Module): T {
+  private instantiateProvider<T>(wrapper: any, moduleRef: Module): T {
     const args = this.resolveConstructorParams(wrapper.metatype, moduleRef);
     const instance = new wrapper.metatype(...args);
     wrapper.instance = instance;
@@ -94,31 +115,19 @@ export class Container {
   /**
    * 实例化 factory provider（useFactory），并缓存实例
    */
-  private instantiateFactoryProvider<T>(wrapper: any, moduleRef: Module): T {
+  private instantiateFactoryAndExistingProvider<T>(
+    wrapper: any,
+    moduleRef: Module
+  ): T {
     const injectTokens: InjectionToken[] = wrapper.inject || [];
     const deps = injectTokens.map((token) => this.resolve(token, moduleRef));
     const instance = wrapper.metatype(...deps);
+    // 新增：工厂产出的对象如果是类实例，也做属性注入
+    if (instance && wrapper.metatype && typeof instance === "object") {
+      this.applyProperties(instance, instance.constructor as Type, moduleRef);
+    }
     wrapper.instance = instance;
     return instance;
-  }
-
-  /**
-   * 获取 value provider（useValue），直接返回已有 instance
-   */
-  private instantiateValueProvider<T>(wrapper: any, _moduleRef: Module): T {
-    // value provider 的 instance 已经存储，直接返回
-    return wrapper.instance;
-  }
-
-  /**
-   * 处理 useExisting (alias) provider
-   */
-  private resolveAliasProvider<T>(wrapper: any, moduleRef: Module): T {
-    // useExisting 的 inject 是 [existingToken]
-    const existingToken = wrapper.inject[0];
-    const instance = this.resolve(existingToken, moduleRef);
-    wrapper.instance = instance;
-    return wrapper.instance;
   }
 
   /**
@@ -134,5 +143,32 @@ export class Container {
       const token = override ? override.param : paramType;
       return this.resolve(token, moduleRef);
     });
+  }
+
+  /**
+   * 通过调用 resolve 方法实例化所有模块中的 providers 和 controllers
+   * 模拟 Nest 的 InstanceLoader.createInstancesOfDependencies
+   */
+  public async createInstancesOfDependencies() {
+    for (const module of this.modules.values()) {
+      for (const token of module.providers.keys()) {
+        this.resolve(token, module);
+      }
+      for (const token of module.controllers.keys()) {
+        this.resolve(token, module);
+      }
+    }
+  }
+
+  /**
+   * 注入属性依赖
+   */
+  private applyProperties(instance: any, metatype: Type, moduleRef: Module) {
+    const properties: Array<{ key: string; type: InjectionToken }> =
+      Reflect.getMetadata(PROPERTY_DEPS_METADATA, metatype) || [];
+    for (const { key, type: token } of properties) {
+      const resolved = this.resolve(token, moduleRef);
+      instance[key] = resolved;
+    }
   }
 }
