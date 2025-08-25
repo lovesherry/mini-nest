@@ -28,6 +28,8 @@ export class RouterExplorer {
     }
   }
   private registerRoutes(controllerClass: Type<any>, moduleRef: Module) {
+    // 通过遍历原型方法注册路由
+    // 参考源码：PathsExplorer.scanForPaths
     const wrapper = moduleRef.controllers.get(controllerClass);
     if (!wrapper || !wrapper.instance) return;
     const instance = wrapper.instance;

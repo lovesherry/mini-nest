@@ -7,13 +7,11 @@ import { InjectionToken } from "@packages/common/interfaces";
 export function Inject(
   token?: InjectionToken
 ): PropertyDecorator & ParameterDecorator {
-  const injectCallHasArguments = arguments.length > 0;
-
   return (target: object, key: string | symbol | undefined, index?: number) => {
     let type = token || Reflect.getMetadata("design:type", target, key!);
 
     if (typeof index === "number") {
-      // 方法参数装饰器
+      // 方法参数装饰器，主要是为了方法（包括contructor）参数的注入
       let dependencies =
         Reflect.getMetadata(SELF_DECLARED_DEPS_METADATA, target) || [];
 
@@ -21,7 +19,7 @@ export function Inject(
       Reflect.defineMetadata(SELF_DECLARED_DEPS_METADATA, dependencies, target);
       return;
     }
-    // 属性装饰器
+    // 属性装饰器，主要是为了 provider 实例化的时候绑定属性
     let properties =
       Reflect.getMetadata(PROPERTY_DEPS_METADATA, target.constructor) || [];
 

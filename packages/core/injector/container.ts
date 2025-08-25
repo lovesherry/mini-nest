@@ -26,35 +26,6 @@ export class Container {
   }
 
   /**
-   * 依赖解析，限定在指定模块内查找
-   */
-  private resolve<T>(token: InjectionToken, moduleRef: Module): T {
-    const { wrapper, module: foundModule } =
-      this.findInstanceWrapper(token, moduleRef) || {};
-    if (!wrapper || !foundModule) {
-      return null as any;
-    }
-    if (wrapper.instance) {
-      return wrapper.instance as T;
-    }
-    // Factory provider / Existing provider
-    if (
-      wrapper.metatype &&
-      typeof wrapper.metatype === "function" &&
-      Array.isArray(wrapper.inject)
-    ) {
-      return this.instantiateFactoryAndExistingProvider(wrapper, foundModule);
-    }
-    // Normal provider / Class provider
-    if (wrapper.metatype && typeof wrapper.metatype === "function") {
-      const instance = this.instantiateProvider(wrapper, foundModule) as T;
-      this.applyProperties(instance, wrapper.metatype as Type, foundModule);
-      return instance;
-    }
-    return null as any;
-  }
-
-  /**
    * 在当前模块和其 imports 的 exports 中递归查找 InstanceWrapper
    */
   private findInstanceWrapper(
@@ -120,7 +91,9 @@ export class Container {
     moduleRef: Module
   ): T {
     const injectTokens: InjectionToken[] = wrapper.inject || [];
-    const deps = injectTokens.map((token) => this.resolve(token, moduleRef));
+    const deps = injectTokens.map((token) =>
+      this.resolveSingleParam(token, moduleRef)
+    );
     const instance = wrapper.metatype(...deps);
     // 新增：工厂产出的对象如果是类实例，也做属性注入
     if (instance && wrapper.metatype && typeof instance === "object") {
@@ -141,8 +114,23 @@ export class Container {
     return paramTypes.map((paramType, index) => {
       const override = injectTokens.find((dep) => dep.index === index);
       const token = override ? override.param : paramType;
-      return this.resolve(token, moduleRef);
+      return this.resolveSingleParam(token, moduleRef);
     });
+  }
+
+  /**
+   * 解析单个依赖参数，优先在当前模块查找，找不到则递归查找 imports
+   */
+  private resolveSingleParam(token: InjectionToken, moduleRef: Module) {
+    const found = this.findInstanceWrapper(token, moduleRef);
+    if (found) {
+      const { wrapper, module } = found;
+      if (!wrapper.instance) {
+        this.loadProvider(wrapper, module);
+      }
+      return wrapper.instance;
+    }
+    return null;
   }
 
   /**
@@ -151,12 +139,31 @@ export class Container {
    */
   public async createInstancesOfDependencies() {
     for (const module of this.modules.values()) {
-      for (const token of module.providers.keys()) {
-        this.resolve(token, module);
+      for (const instanceWrapper of module.providers.values()) {
+        this.loadProvider(instanceWrapper, module);
       }
-      for (const token of module.controllers.keys()) {
-        this.resolve(token, module);
+      for (const instanceWrapper of module.controllers.values()) {
+        this.loadProvider(instanceWrapper, module);
       }
+    }
+  }
+
+  /**
+   * 加载 provider，实例化并注入属性
+   */
+  private loadProvider(wrapper: InstanceWrapper, moduleRef: Module) {
+    if (wrapper.instance) {
+      return;
+    }
+    if (
+      wrapper.metatype &&
+      typeof wrapper.metatype === "function" &&
+      Array.isArray(wrapper.inject)
+    ) {
+      this.instantiateFactoryAndExistingProvider(wrapper, moduleRef);
+    } else if (wrapper.metatype && typeof wrapper.metatype === "function") {
+      const instance = this.instantiateProvider(wrapper, moduleRef);
+      this.applyProperties(instance, wrapper.metatype as Type, moduleRef);
     }
   }
 
@@ -167,7 +174,7 @@ export class Container {
     const properties: Array<{ key: string; type: InjectionToken }> =
       Reflect.getMetadata(PROPERTY_DEPS_METADATA, metatype) || [];
     for (const { key, type: token } of properties) {
-      const resolved = this.resolve(token, moduleRef);
+      const resolved = this.resolveSingleParam(token, moduleRef);
       instance[key] = resolved;
     }
   }
