@@ -1,6 +1,9 @@
-import express from "express";
+import express, { Express } from "express";
 
-const app = express();
-app.use(express.json());
+function createHttpServer(): Express {
+  const app = express();
+  app.use(express.json());
+  return app;
+}
 
-export { app };
+export default createHttpServer;
