@@ -7,7 +7,9 @@ import {
   Type,
   ValueProvider,
 } from "@packages/common/interfaces";
-import { InstanceWrapper } from "../instance-wrapper";
+import { InstanceWrapper } from "./instance-wrapper";
+import { getClassScope } from "../helpers/get-class-scope";
+import { Scope } from "@packages/common";
 
 export class Module {
   private _providers = new Map<InjectionToken, InstanceWrapper>();
@@ -49,6 +51,7 @@ export class Module {
         token: provider as InjectionToken,
         metatype: provider as Type,
         instance: null,
+        scope: getClassScope(provider),
       })
     );
     return provider;
@@ -61,6 +64,7 @@ export class Module {
         token: controller,
         metatype: controller,
         instance: null,
+        scope: getClassScope(controller),
       })
     );
   }
@@ -86,27 +90,29 @@ export class Module {
     provider: ClassProvider | ValueProvider | FactoryProvider | ExistingProvider
   ) {
     if (this.isCustomClass(provider)) {
-      const { provide, useClass } = provider;
+      const { provide, useClass, scope } = provider;
       this._providers.set(
         provide,
         new InstanceWrapper({
           token: provide,
           metatype: useClass,
           instance: null,
+          scope,
         })
       );
     } else if (this.isCustomValue(provider)) {
-      const { provide, useValue } = provider;
+      const { provide, useValue, scope } = provider;
       this._providers.set(
         provide,
         new InstanceWrapper({
           token: provide,
           metatype: null as any,
           instance: useValue,
+          scope,
         })
       );
     } else if (this.isCustomFactory(provider)) {
-      const { provide, useFactory, inject = [] } = provider;
+      const { provide, useFactory, inject = [], scope } = provider;
       this._providers.set(
         provide,
         new InstanceWrapper({
@@ -114,10 +120,11 @@ export class Module {
           metatype: useFactory as any,
           instance: null,
           inject,
+          scope,
         })
       );
     } else if (this.isCustomUseExisting(provider)) {
-      const { provide, useExisting } = provider;
+      const { provide, useExisting, scope } = provider;
       this._providers.set(
         provide,
         new InstanceWrapper({
@@ -125,6 +132,7 @@ export class Module {
           metatype: (instance: any) => instance,
           instance: null,
           inject: [useExisting],
+          scope,
         })
       );
     }
@@ -142,5 +150,13 @@ export class Module {
   }
   private isCustomUseExisting(provider: any): provider is ExistingProvider {
     return provider && provider.useExisting !== undefined;
+  }
+
+  private isTransientProvider(provider: Type<any>): boolean {
+    return getClassScope(provider) === Scope.TRANSIENT;
+  }
+
+  private isRequestScopeProvider(provider: Type<any>): boolean {
+    return getClassScope(provider) === Scope.REQUEST;
   }
 }

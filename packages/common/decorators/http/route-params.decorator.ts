@@ -43,5 +43,7 @@ function createRouteParamDecorator(paramtype: RouteParamtypes) {
 export const Param = createRouteParamDecorator(RouteParamtypes.PARAM);
 export const Query = createRouteParamDecorator(RouteParamtypes.QUERY);
 export const Body = createRouteParamDecorator(RouteParamtypes.BODY);
-export const Res = createRouteParamDecorator(RouteParamtypes.RESPONSE);
-export const Req = createRouteParamDecorator(RouteParamtypes.REQUEST);
+export const Response = createRouteParamDecorator(RouteParamtypes.RESPONSE);
+export const Request = createRouteParamDecorator(RouteParamtypes.REQUEST);
+export const Res = Response;
+export const Req = Request;

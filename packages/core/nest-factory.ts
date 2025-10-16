@@ -3,6 +3,7 @@ import { Container } from "./injector/container";
 import { Type } from "@packages/common/interfaces";
 import createHttpServer from "@packages/platform-express";
 import { Module } from "./injector/module";
+import { InternalCoreModule } from "./internal-core-module";
 
 type IEntryNestModule = Type<any>;
 
@@ -12,6 +13,9 @@ export class NestFactory {
     // 创建DI容器
     const container = new Container();
 
+    // 先注册核心模块
+    container.addModule(InternalCoreModule);
+
     // 1. 递归扫描模块（构建模块依赖图）；
     // 参考源码：dependenciesScanner.scanForModules
     this.scanModules(moduleCls, container);
@@ -20,6 +24,9 @@ export class NestFactory {
     // 参考源码：dependenciesScanner.scanModulesForDependencies
     this.registerModules(container);
 
+    // 绑定全局模块的 providers 到其他模块
+    this.bindGlobalModules(container);
+
     // 3. 实例化所有依赖
     // 参考源码：instanceLoader.createInstances
     await container.createInstancesOfDependencies();
@@ -27,7 +34,6 @@ export class NestFactory {
     // 4. 注册路由（入口模块）
     const routerExplorer = new RouterExplorer(httpServer, container);
     routerExplorer.registerAllRoutes();
-    console.log(container.getModules());
 
     return httpServer;
   }
@@ -65,6 +71,21 @@ export class NestFactory {
       for (const e of exportsList) {
         moduleRef.addExportedProviderOrModule(e);
       }
+    });
+  }
+
+  private static bindGlobalModules(container: Container) {
+    const modules = container.getModules();
+    const globalModules = container.getGlobalModules();
+    if (globalModules.size === 0) return;
+
+    modules.forEach((moduleRef) => {
+      if (globalModules.has(moduleRef)) {
+        return;
+      }
+      globalModules.forEach((globalModuleRef) => {
+        moduleRef.addImport(globalModuleRef);
+      });
     });
   }
 }
